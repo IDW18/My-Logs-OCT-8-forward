@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Log</title>
+<meta name="description" content="Daily IT work log: tasks, status, photos, Word/PDF export. Data stays in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/index.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  :root{
+    --bg:#15171D;
+    --panel:#1C1F26;
+    --panel-2:#242832;
+    --border:#333844;
+    --border-soft:#2A2E38;
+    --text:#E8E6E0;
+    --text-dim:#9CA3AF;
+    --text-faint:#666D7A;
+    --accent:#5B7C99;
+    --accent-bright:#7EA3C4;
+    --amber:#D9A441;
+    --green:#6B9B7C;
+    --red:#C4675A;
+    --font-ui: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-ui);
+    font-size:14px;
+    line-height:1.5;
+    height:100vh;
+    overflow:hidden;
+  }
+  ::selection{ background:var(--accent); color:#0A0C10; }
+
+  .app{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    height:100vh;
+  }
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    background:var(--panel);
+    border-right:1px solid var(--border-soft);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .brand{
+    padding:20px 18px 16px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .brand-mark{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    color:var(--text-faint);
+    margin-bottom:4px;
+  }
+  .brand-title{
+    font-size:17px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .brand-sub{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+
+  .sidebar-section{
+    padding:14px 18px 8px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-faint);
+    letter-spacing:.06em;
+  }
+
+  .day-list{
+    flex:1;
+    overflow-y:auto;
+    padding:0 10px;
+  }
+  .day-list::-webkit-scrollbar{ width:6px; }
+  .day-list::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+
+  .day-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:9px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    margin-bottom:2px;
+    border:1px solid transparent;
+  }
+  .day-item:hover{ background:var(--panel-2); }
+  .day-item.active{
+    background:var(--panel-2);
+    border-color:var(--border);
+  }
+  .day-item.active .day-date{ color:var(--accent-bright); }
+  .day-date{
+    font-size:13.5px;
+    font-weight:500;
+  }
+  .day-date .weekday{
+    color:var(--text-faint);
+    font-weight:400;
+    margin-right:6px;
+  }
+
+  .empty-days{
+    padding:16px 10px;
+    color:var(--text-faint);
+    font-size:12.5px;
+  }
+
+  .sidebar-footer{
+    padding:14px 16px 16px;
+    border-top:1px solid var(--border-soft);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .btn-ghost{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-ui);
+    font-size:12.5px;
+    padding:8px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    text-align:left;
+    transition:border-color .15s, color .15s;
+  }
+  .btn-ghost:hover{ border-color:var(--accent); color:var(--text); }
+  
+  .btn-auth {
+    border-color: var(--accent);
+    color: var(--accent-bright);
+    font-weight: 600;
+  }
+
+  /* ---------- MAIN ---------- */
+  .main{
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .topbar{
+    padding:20px 28px 16px;
+    border-bottom:1px solid var(--border-soft);
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:20px;
+    flex-wrap:wrap;
+  }
+  .topbar-date{
+    font-size:20px;
+    font-weight:600;
+  }
+  .topbar-date .full-date{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-faint);
+    font-weight:400;
+    display:block;
+    margin-top:3px;
+    letter-spacing:.03em;
+  }
+  .topbar-stats{
+    display:flex;
+    gap:18px;
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+  }
+  .stat-num{ color:var(--text); font-weight:600; font-size:14px; }
+
+  .btn-primary{
+    background:var(--accent);
+    color:#0F1216;
+    border:none;
+    font-family:var(--font-ui);
+    font-weight:600;
+    font-size:13px;
+    padding:9px 16px;
+    border-radius:4px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background .15s;
+  }
+  .btn-primary:hover{ background:var(--accent-bright); }
+
+  .toolbar{
+    padding:14px 28px;
+    border-bottom:1px solid var(--border-soft);
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .search-box{
+    flex:1;
+    min-width:180px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:8px 12px;
+    color:var(--text);
+    font-family:var(--font-ui);
+    font-size:13px;
+  }
+  .search-box:focus{ outline:none; border-color:var(--accent); }
+  .search-box::placeholder{ color:var(--text-faint); }
+
+  select.filter-select{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:8px 10px;
+    color:var(--text-dim);
+    font-family:var(--font-ui);
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  select.filter-select:focus{ outline:none; border-color:var(--accent); }
+
+  .entries-scroll{
+    flex:1;
+    overflow-y:auto;
+    padding:16px 28px 40px;
+  }
+  .entries-scroll::-webkit-scrollbar{ width:8px; }
+  .entries-scroll::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+
+  .entry{
+    display:flex;
+    background:var(--panel);
+    border:1px solid var(--border-soft);
+    border-radius:5px;
+    margin-bottom:10px;
+    overflow:hidden;
+  }
+  .entry-bar{ width:4px; flex-shrink:0; }
+  .entry-bar.status-done{ background:var(--green); }
+  .entry-bar.status-pending{ background:var(--amber); }
+  .entry-bar.status-ongoing{ background:var(--accent); }
+
+  .entry-body{
+    flex:1;
+    padding:13px 16px;
+  }
+  .entry-top{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:7px;
+  }
+  .entry-time{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+  }
+  .tag{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.03em;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    padding:2px 7px;
+    border-radius:3px;
+  }
+  .tag.remarks-ok{ border-color:var(--green); color:var(--green); }
+  .tag.remarks-replace{ border-color:var(--red); color:var(--red); }
+
+  /* NOTE COLOR INDICATORS */
+  .note-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+  }
+  .note-tag.indicator-red {
+    background: rgba(196, 103, 90, 0.18);
+    color: var(--red);
+    border: 1px solid var(--red);
+  }
+  .note-tag.indicator-green {
+    background: rgba(107, 155, 124, 0.18);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+  .note-tag.indicator-orange {
+    background: rgba(217, 164, 65, 0.18);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+  }
+
+  .status-label{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.03em;
+  }
+  .status-label.status-done{ color:var(--green); }
+  .status-label.status-pending{ color:var(--amber); }
+  .status-label.status-ongoing{ color:var(--accent-bright); }
+
+  .entry-desc{
+    font-size:14px;
+    color:var(--text);
+    line-height:1.5;
+    margin-bottom:8px;
+    white-space:pre-wrap;
+  }
+  .entry-meta{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    font-size:12px;
+    color:var(--text-faint);
+  }
+  .entry-meta span b{ color:var(--text-dim); font-weight:500; }
+
+  .entry-photos{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .entry-photo-thumb{
+    width:72px;
+    height:72px;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--border);
+    cursor:pointer;
+    transition:border-color .15s, transform .15s;
+  }
+  .entry-photo-thumb:hover{
+    border-color:var(--accent);
+    transform:scale(1.03);
+  }
+
+  .entry-actions{
+    display:flex;
+    flex-direction:column;
+    border-left:1px solid var(--border-soft);
+  }
+  .entry-actions button{
+    flex:1;
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--border-soft);
+    color:var(--text-faint);
+    font-family:var(--font-ui);
+    font-size:11.5px;
+    padding:0 14px;
+    cursor:pointer;
+    transition:color .15s, background .15s;
+  }
+  .entry-actions button:last-child{ border-bottom:none; }
+  .entry-actions button:hover{ color:var(--text); background:var(--panel-2); }
+  .entry-actions button.danger:hover{ color:var(--red); }
+
+  .empty-state{
+    text-align:center;
+    padding:80px 20px;
+    color:var(--text-faint);
+  }
+  .empty-state-icon{
+    font-family:var(--font-mono);
+    font-size:32px;
+    color:var(--border);
+    margin-bottom:12px;
+  }
+  .empty-state p{ font-size:13.5px; margin-bottom:16px; }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,12,16,.7);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    width:100%;
+    max-width:520px;
+    max-height:90vh;
+    overflow-y:auto;
+  }
+  .modal-header{
+    padding:18px 22px;
+    border-bottom:1px solid var(--border-soft);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .modal-header h2{ font-size:16px; font-weight:600; }
+  .modal-close{
+    background:none; border:none; color:var(--text-faint);
+    font-size:20px; cursor:pointer; line-height:1;
+  }
+  .modal-close:hover{ color:var(--text); }
+  .modal-body{ padding:20px 22px; }
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    font-weight:500;
+  }
+  .field input, .field select, .field textarea{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:9px 11px;
+    color:var(--text);
+    font-family:var(--font-ui);
+    font-size:13.5px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none; border-color:var(--accent);
+  }
+  .field textarea{ resize:vertical; min-height:80px; font-family:var(--font-ui); }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .category-row{
+    display:flex;
+    gap:8px;
+  }
+  .category-row select{ flex:1; }
+  .btn-add-cat{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-ui);
+    font-size:12px;
+    padding:0 12px;
+    border-radius:4px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .btn-add-cat:hover{ border-color:var(--accent); color:var(--text); }
+  .new-category-row{
+    display:none;
+    gap:8px;
+    margin-top:8px;
+  }
+  .new-category-row.open{ display:flex; }
+  .new-category-row input{ flex:1; }
+
+  .photo-upload-zone{
+    border:1.5px dashed var(--border);
+    border-radius:5px;
+    padding:18px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .photo-upload-zone:hover, .photo-upload-zone.dragover{
+    border-color:var(--accent);
+    background:rgba(91,124,153,.06);
+  }
+  .photo-upload-zone .upload-icon{
+    font-family:var(--font-mono);
+    font-size:20px;
+    color:var(--text-faint);
+    margin-bottom:6px;
+  }
+  .photo-upload-zone .upload-text{
+    font-size:12.5px;
+    color:var(--text-dim);
+  }
+  .photo-upload-zone .upload-sub{
+    font-size:11px;
+    color:var(--text-faint);
+    margin-top:2px;
+  }
+  .photo-previews{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .photo-preview-item{
+    position:relative;
+    width:76px;
+    height:76px;
+  }
+  .photo-preview-item img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--border);
+  }
+  .photo-preview-remove{
+    position:absolute;
+    top:-6px;
+    right:-6px;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:var(--red);
+    color:#fff;
+    border:2px solid var(--panel);
+    font-size:11px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+  .upload-progress{
+    font-size:11.5px;
+    color:var(--text-faint);
+    margin-top:8px;
+    font-family:var(--font-mono);
+  }
+
+  /* ---------- LIGHTBOX ---------- */
+  .lightbox-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(8,9,12,.92);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:200;
+    padding:30px;
+  }
+  .lightbox-overlay.open{ display:flex; }
+  .lightbox-overlay img{
+    max-width:100%;
+    max-height:85vh;
+    border-radius:4px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .lightbox-close{
+    position:absolute;
+    top:20px;
+    right:26px;
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    font-size:28px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .lightbox-close:hover{ color:var(--text); }
+  .lightbox-nav{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    width:38px; height:38px;
+    border-radius:50%;
+    cursor:pointer;
+    font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .lightbox-nav:hover{ border-color:var(--accent); }
+  .lightbox-nav.prev{ left:20px; }
+  .lightbox-nav.next{ right:20px; }
+  .lightbox-counter{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    background:var(--panel);
+    border:1px solid var(--border-soft);
+    padding:4px 12px;
+    border-radius:12px;
+  }
+  .modal-footer{
+    padding:16px 22px 20px;
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+  }
+  .btn-secondary{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-ui);
+    font-size:13px;
+    padding:9px 16px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .btn-secondary:hover{ border-color:var(--text-dim); color:var(--text); }
+
+  /* Admin Guard Utility Classes */
+  .admin-only {
+    display: none !important;
+  }
+  body.is-admin .admin-only {
+    display: inline-flex !important;
+  }
+  body.is-admin .admin-only-block {
+    display: block !important;
+  }
+  body.is-admin .admin-only-flex {
+    display: flex !important;
+  }
+
+  @media print{
+    .sidebar, .toolbar, .topbar button, .entry-actions, .lightbox-overlay{ display:none !important; }
+    body{ background:#fff; color:#000; }
+    .app{ display:block; height:auto; }
+    .main{ overflow:visible; }
+    .entries-scroll{ overflow:visible; padding:0; }
+    .entry{ background:#fff; border:1px solid #ccc; break-inside:avoid; }
+    .topbar{ border:none; }
+    .entry-photo-thumb{ width:100px; height:100px; }
+  }
+
+  @media (max-width: 720px){
+    .app{ grid-template-columns:1fr; }
+    .sidebar{
+      position:fixed; left:0; top:0; bottom:0; width:260px; z-index:50;
+      transform:translateX(-100%); transition:transform .2s;
+    }
+    .sidebar.open{ transform:translateX(0); }
+    .mobile-menu-btn{ display:inline-flex !important; }
+  }
+  .mobile-menu-btn{
+    display:none;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:4px;
+    padding:8px 10px;
+    cursor:pointer;
+    align-items:center;
+    justify-content:center;
+    font-size:16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-title">Work Log</div>
+      <div class="brand-sub" id="totalEntriesLabel">0 entries logged</div>
+    </div>
+    <div class="sidebar-section">LOG DAYS</div>
+    <div class="day-list" id="dayList"></div>
+    <div class="sidebar-footer">
+      <button class="btn-ghost" onclick="showAllActivities()">View All Activities</button>
+      <button class="btn-ghost" onclick="jumpToToday()">Jump to today</button>
+      <button class="btn-ghost admin-only" onclick="exportAllJSON()">Export all (.json)</button>
+      <button class="btn-ghost admin-only" onclick="triggerImport()">Import (.json)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+      
+      <button class="btn-ghost btn-auth" id="btnLogin" onclick="openLoginModal()">Admin Login</button>
+      <button class="btn-ghost btn-auth admin-only" id="btnLogout" onclick="logoutAdmin()">Logout Admin</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+        <div class="topbar-date">
+          <span id="topDateLabel">—</span>
+          <span class="full-date" id="topDateFull"></span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+        <div class="topbar-stats">
+          <div><span class="stat-num" id="statTotal">0</span> tasks</div>
+          <div><span class="stat-num" id="statDone">0</span> done</div>
+          <div><span class="stat-num" id="statPending">0</span> pending</div>
+        </div>
+        <button class="btn-primary admin-only" onclick="openModal()">+ New Task</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-box" id="searchBox" placeholder="Search tasks, requester, category..." oninput="renderEntries()">
+      <select class="filter-select" id="filterCategory" onchange="renderEntries()">
+        <option value="">All Categories</option>
+      </select>
+      <select class="filter-select" id="filterStatus" onchange="renderEntries()">
+        <option value="">All Status</option>
+        <option value="done">Done</option>
+        <option value="ongoing">Ongoing</option>
+        <option value="pending">Pending</option>
+      </select>
+      <select class="filter-select" id="filterRemarks" onchange="renderEntries()">
+        <option value="">All Remarks</option>
+        <option value="ok">Okay</option>
+        <option value="replace">Needs Replacement</option>
+      </select>
+      <button class="btn-secondary" onclick="window.print()">Print</button>
+      <button class="btn-secondary admin-only" onclick="openExportModal('docx')">Export Word</button>
+      <button class="btn-secondary admin-only" onclick="openExportModal('pdf')">Export PDF</button>
+    </div>
+
+    <div class="entries-scroll" id="entriesScroll"></div>
+  </main>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal-overlay" id="loginModalOverlay">
+  <div class="modal" style="max-width: 360px;">
+    <div class="modal-header">
+      <h2>Admin Login</h2>
+      <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Passcode</label>
+        <input type="password" id="adminPassword" placeholder="">
+      </div>
+      <div style="color: var(--red); font-size: 12px; display: none;" id="loginError">
+        Incorrect password!
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeLoginModal()">Cancel</button>
+      <button class="btn-primary" onclick="loginAdmin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">New Task Entry</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div class="field-row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="fDate">
+        </div>
+        <div class="field">
+          <label>Time (e.g., 7:00 am or 1:00 pm)</label>
+          <input type="text" id="fTime" placeholder="e.g. 7:00 am">
+        </div>
+      </div>
+      <div class="field">
+        <label>Item Name</label>
+        <input type="text" id="fItemName" placeholder="e.g. LAN Cable, Power Supply Unit, Router">
+      </div>
+      <div class="field">
+        <label>Task Description</label>
+        <textarea id="fDesc" placeholder="What did you do? e.g. Replaced faulty LAN cable at Computer Lab 2, restored network connectivity for 5 units."></textarea>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <div class="category-row">
+          <select id="fCategory"></select>
+          <button type="button" class="btn-add-cat" onclick="toggleNewCategoryRow()">+ New</button>
+        </div>
+        <div class="new-category-row" id="newCategoryRow">
+          <input type="text" id="fNewCategory" placeholder="Type new category name">
+          <button type="button" class="btn-add-cat" onclick="addNewCategory()">Add</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Status</label>
+          <select id="fStatus">
+            <option value="done">Done</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Item Remarks</label>
+          <select id="fRemarks">
+            <option value="ok">Okay</option>
+            <option value="replace">Needs Replacement</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Requested By / Location</label>
+        <input type="text" id="fRequester" placeholder="e.g. Registrar's Office, Ms. Santos, Room 204">
+      </div>
+      
+      <!-- UPDATED NOTES FIELD WITH COLOR INDICATOR -->
+      <div class="field">
+        <label>Notes &amp; Color Indicator</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+          <select id="fNoteColor" style="width: 150px; font-weight: 500;">
+            <option value="none">No Indicator</option>
+            <option value="red" style="color: var(--red);">🔴 Red Marker</option>
+            <option value="green" style="color: var(--green);">🟢 Green Marker</option>
+            <option value="orange" style="color: var(--amber);">🟠 Orange Marker</option>
+          </select>
+        </div>
+        <textarea id="fNotes" placeholder="Additional remarks, parts used, follow-up needed..." style="min-height:56px;"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Documentation Photos</label>
+        <div class="photo-upload-zone" id="uploadZone" onclick="document.getElementById('fPhotos').click()">
+          <div class="upload-icon">⎙</div>
+          <div class="upload-text">Click to add photos, or drag &amp; drop</div>
+          <div class="upload-sub">Before/after shots, error screens, receipts — JPG/PNG, auto-compressed</div>
+        </div>
+        <input type="file" id="fPhotos" accept="image/*" multiple capture="environment" style="display:none" onchange="handlePhotoSelect(event)">
+        <div class="upload-progress" id="uploadProgress" style="display:none;"></div>
+        <div class="photo-previews" id="photoPreviews"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEntry()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox-overlay" id="lightboxOverlay" onclick="lightboxOverlayClick(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <button class="lightbox-nav prev" id="lightboxPrev" onclick="lightboxNav(-1)">&#8249;</button>
+  <img id="lightboxImg" src="" alt="Documentation photo">
+  <button class="lightbox-nav next" id="lightboxNext" onclick="lightboxNav(1)">&#8250;</button>
+  <div class="lightbox-counter" id="lightboxCounter"></div>
+</div>
+
+<!-- EXPORT RANGE MODAL -->
+<div class="modal-overlay" id="exportModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="exportModalTitle">Export</h2>
+      <button class="modal-close" onclick="closeExportModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Range</label>
+        <select id="exportRangeMode" onchange="updateExportRangeVisibility()">
+          <option value="current">Currently viewed day</option>
+          <option value="range">Custom date range</option>
+          <option value="all">All entries</option>
+        </select>
+      </div>
+      <div class="field-row" id="exportRangeFields" style="display:none;">
+        <div class="field">
+          <label>From</label>
+          <input type="date" id="exportFrom">
+        </div>
+        <div class="field">
+          <label>To</label>
+          <input type="date" id="exportTo">
+        </div>
+      </div>
+      <div class="upload-progress" id="exportProgress" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeExportModal()">Cancel</button>
+      <button class="btn-primary" id="exportConfirmBtn" onclick="runExport()">Export</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'Work_log_v2_entries';
+const CATEGORY_KEY = 'Work_log_v2_categories';
+const DEFAULT_CATEGORIES = ['Network','Hardware','Software','System Admin','Troubleshooting','Maintenance','User Support','Installation','Documentation','Meeting','Other'];
+// SHA-256 hash of the admin passcode (the passcode itself is NOT stored in this file).
+// To change it: open the browser console and run:
+//   crypto.subtle.digest('SHA-256', new TextEncoder().encode('NEW_PASSCODE')).then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('')))
+// then paste the result below.
+const ADMIN_PASSCODE_HASH = '31aa6a5cb0da5b967626ec6a55b51cdd5cb3845a02c4507a1436a557dd5cc6df';
+
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// OPTIONAL: SMS / notification backend endpoint. Leave empty to disable (GitHub Pages has no backend).
+const NOTIFICATION_API_URL = '';
+
+let entries = [];
+let customCategories = [];
+let selectedDate = null; // null or 'ALL' or 'YYYY-MM-DD'
+let currentPhotos = []; 
+let lightboxPhotos = [];
+let lightboxIndex = 0;
+let isAdmin = false;
+
+// Format 24-hour time or raw string to 12-hour lowercase format (e.g. 7:00 am, 1:00 pm)
+function formatTo12Hour(timeStr) {
+  if (!timeStr) return '--:--';
+  if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
+    return timeStr.toLowerCase();
+  }
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  if (isNaN(hours)) return timeStr;
+
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+function loadCategories(){
+  try{
+    const raw = localStorage.getItem(CATEGORY_KEY);
+    customCategories = raw ? JSON.parse(raw) : [];
+  }catch(e){ customCategories = []; }
+}
+function saveCategories(){
+  localStorage.setItem(CATEGORY_KEY, JSON.stringify(customCategories));
+}
+function getAllCategories(){
+  const merged = [...DEFAULT_CATEGORIES];
+  customCategories.forEach(c => { if(!merged.includes(c)) merged.push(c); });
+  return merged;
+}
+
+function loadEntries(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    entries = raw ? JSON.parse(raw) : [];
+  }catch(e){ entries = []; }
+}
+function saveEntries(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function fmtDateLabel(dateStr){
+  if(dateStr === 'ALL') return { weekday: 'All', short: 'Activities', full: '' };
+  const d = new Date(dateStr + 'T00:00:00');
+  const weekday = d.toLocaleDateString('en-US', { weekday:'short' });
+  const month = d.toLocaleDateString('en-US', { month:'short' });
+  return { weekday, short: `${month} ${d.getDate()}`, full: d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) };
+}
+
+function getDaysWithEntries(){
+  const days = [...new Set(entries.map(e => e.date))];
+  days.sort((a,b) => b.localeCompare(a));
+  return days;
+}
+
+function renderDayList(){
+  const list = document.getElementById('dayList');
+  const days = getDaysWithEntries();
+  const t = todayStr();
+  let allDays = days.includes(t) ? days : [t, ...days];
+  allDays = [...new Set(allDays)].sort((a,b) => b.localeCompare(a));
+
+  if(!selectedDate) selectedDate = allDays[0] || t;
+
+  document.getElementById('totalEntriesLabel').textContent = `${entries.length} ${entries.length===1?'entry':'entries'} logged`;
+
+  let html = `<div class="day-item ${selectedDate === 'ALL' ? 'active' : ''}" onclick="selectDay('ALL')">
+    <div class="day-date"><span class="weekday">All</span>Activities</div>
+  </div>`;
+
+  if(allDays.length === 0){
+    list.innerHTML = html + '<div class="empty-days">No days yet.</div>';
+    return;
+  }
+
+  html += allDays.map(date => {
+    const label = fmtDateLabel(date);
+    const active = date === selectedDate ? 'active' : '';
+    return `<div class="day-item ${active}" onclick="selectDay('${date}')">
+      <div class="day-date"><span class="weekday">${label.weekday}</span>${label.short}</div>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = html;
+}
+
+function selectDay(date){
+  selectedDate = date;
+  renderDayList();
+  renderEntries();
+}
+
+function jumpToToday(){
+  selectDay(todayStr());
+}
+
+function showAllActivities(){
+  selectDay('ALL');
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+/* ---------- ADMIN AUTHENTICATION ---------- */
+function openLoginModal(){
+  document.getElementById('adminPassword').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginModalOverlay').classList.add('open');
+  document.getElementById('adminPassword').focus();
+}
+
+function closeLoginModal(){
+  document.getElementById('loginModalOverlay').classList.remove('open');
+}
+
+async function loginAdmin(){
+  const pwd = document.getElementById('adminPassword').value;
+  let ok = false;
+  try{ ok = (await sha256Hex(pwd)) === ADMIN_PASSCODE_HASH; }
+  catch(e){ alert('Login needs a secure context (https:// or localhost).'); return; }
+  if(ok){
+    isAdmin = true;
+    document.body.classList.add('is-admin');
+    closeLoginModal();
+    renderEntries();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+function logoutAdmin(){
+  isAdmin = false;
+  document.body.classList.remove('is-admin');
+  renderEntries();
+}
+
+function populateCategoryFilter(){
+  const sel = document.getElementById('filterCategory');
+  const cats = [...new Set(entries.map(e => e.category))].sort();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = current;
+}
+
+function populateFormCategorySelect(selected){
+  const sel = document.getElementById('fCategory');
+  const cats = getAllCategories();
+  sel.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(selected && !cats.includes(selected)){
+    sel.innerHTML += `<option value="${escapeHtml(selected)}">${escapeHtml(selected)}</option>`;
+  }
+  sel.value = selected || cats[0];
+}
+
+function toggleNewCategoryRow(){
+  const row = document.getElementById('newCategoryRow');
+  row.classList.toggle('open');
+  if(row.classList.contains('open')){
+    document.getElementById('fNewCategory').focus();
+  }
+}
+
+function addNewCategory(){
+  const input = document.getElementById('fNewCategory');
+  const name = input.value.trim();
+  if(!name) return;
+  if(!getAllCategories().includes(name)){
+    customCategories.push(name);
+    saveCategories();
+  }
+  populateFormCategorySelect(name);
+  input.value = '';
+  document.getElementById('newCategoryRow').classList.remove('open');
+}
+
+function renderEntries(){
+  renderDayList();
+  populateCategoryFilter();
+
+  const label = fmtDateLabel(selectedDate);
+  document.getElementById('topDateLabel').textContent = selectedDate === 'ALL' ? 'All Activities' : label.weekday + ', ' + label.short;
+  document.getElementById('topDateFull').textContent = label.full.toUpperCase();
+
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  const fCat = document.getElementById('filterCategory').value;
+  const fStat = document.getElementById('filterStatus').value;
+  const fRem = document.getElementById('filterRemarks').value;
+
+  let dayEntries = selectedDate === 'ALL' ? [...entries] : entries.filter(e => e.date === selectedDate);
+
+  if(search){
+    dayEntries = dayEntries.filter(e =>
+      (e.desc||'').toLowerCase().includes(search) ||
+      (e.requester||'').toLowerCase().includes(search) ||
+      (e.category||'').toLowerCase().includes(search) ||
+      (e.itemName||'').toLowerCase().includes(search) ||
+      (e.notes||'').toLowerCase().includes(search)
+    );
+  }
+  if(fCat) dayEntries = dayEntries.filter(e => e.category === fCat);
+  if(fStat) dayEntries = dayEntries.filter(e => e.status === fStat);
+  if(fRem) dayEntries = dayEntries.filter(e => e.remarks === fRem);
+
+  dayEntries.sort((a,b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
+
+  const fullSet = selectedDate === 'ALL' ? entries : entries.filter(e => e.date === selectedDate);
+  document.getElementById('statTotal').textContent = fullSet.length;
+  document.getElementById('statDone').textContent = fullSet.filter(e => e.status==='done').length;
+  document.getElementById('statPending').textContent = fullSet.filter(e => e.status==='pending').length;
+
+  const container = document.getElementById('entriesScroll');
+  if(dayEntries.length === 0){
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">···</div>
+      <p>No tasks found.</p>
+      ${isAdmin ? '<button class="btn-primary" onclick="openModal()">+ Log a task</button>' : ''}
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = dayEntries.map(e => {
+    const statClass = 'status-' + (e.status||'done');
+    const statText = { done:'DONE', pending:'PENDING', ongoing:'ONGOING' }[e.status] || 'DONE';
+    const remClass = e.remarks === 'replace' ? 'remarks-replace' : 'remarks-ok';
+    const remText = e.remarks === 'replace' ? 'NEEDS REPLACEMENT' : 'OKAY';
+    
+    // Check if color marker exists
+    const noteMarkerTag = (e.noteColor && e.noteColor !== 'none') ? `<span class="note-tag indicator-${e.noteColor}">${e.noteColor}</span>` : '';
+
+    return `<div class="entry">
+      <div class="entry-bar ${statClass}"></div>
+      <div class="entry-body">
+        <div class="entry-top">
+          <span class="entry-time">${e.date ? escapeHtml(e.date) + ' ' : ''}${formatTo12Hour(e.time)}</span>
+          <span class="tag">${escapeHtml(e.category||'Other')}</span>
+          ${e.itemName ? `<span class="tag">${escapeHtml(e.itemName)}</span>` : ''}
+          <span class="tag ${remClass}">${remText}</span>
+          <span class="status-label ${statClass}">${statText}</span>
+        </div>
+        <div class="entry-desc">${escapeHtml(e.desc)}</div>
+        <div class="entry-meta">
+          ${e.requester ? `<span><b>Requested by:</b> ${escapeHtml(e.requester)}</span>` : ''}
+          ${e.notes ? `<span><b>Notes:</b> ${noteMarkerTag}${escapeHtml(e.notes)}</span>` : ''}
+        </div>
+        ${(e.photos && e.photos.length) ? `<div class="entry-photos">
+          ${e.photos.map((p, i) => `<img class="entry-photo-thumb" src="${p}" alt="Documentation ${i+1}" onclick='openLightbox(${JSON.stringify(e.photos)}, ${i})'>`).join('')}
+        </div>` : ''}
+      </div>
+      ${isAdmin ? `<div class="entry-actions">
+        <button onclick="editEntry('${e.id}')">Edit</button>
+        <button class="danger" onclick="deleteEntry('${e.id}')">Delete</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(str){
+  if(!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ---------- PHOTO HANDLING ---------- */
+function compressImage(file, maxDim = 1280, quality = 0.72){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > height && width > maxDim){
+          height = Math.round(height * (maxDim / width));
+          width = maxDim;
+        }else if(height > maxDim){
+          width = Math.round(width * (maxDim / height));
+          height = maxDim;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Could not read image'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoSelect(evt){
+  const files = Array.from(evt.target.files || []);
+  if(files.length === 0) return;
+  const progressEl = document.getElementById('uploadProgress');
+  progressEl.style.display = 'block';
+
+  for(let i = 0; i < files.length; i++){
+    const file = files[i];
+    if(!file.type.startsWith('image/')) continue;
+    progressEl.textContent = `Processing photo ${i+1} of ${files.length}...`;
+    try{
+      const compressed = await compressImage(file);
+      currentPhotos.push(compressed);
+      renderPhotoPreviews();
+    }catch(err){
+      console.error('Photo processing failed', err);
+    }
+  }
+  progressEl.style.display = 'none';
+  evt.target.value = '';
+}
+
+function renderPhotoPreviews(){
+  const container = document.getElementById('photoPreviews');
+  container.innerHTML = currentPhotos.map((src, idx) => `
+    <div class="photo-preview-item">
+      <img src="${src}" alt="Preview ${idx+1}">
+      <button type="button" class="photo-preview-remove" onclick="removeCurrentPhoto(${idx})">&times;</button>
+    </div>
+  `).join('');
+}
+
+function removeCurrentPhoto(idx){
+  currentPhotos.splice(idx, 1);
+  renderPhotoPreviews();
+}
+
+function setupDragDrop(){
+  const zone = document.getElementById('uploadZone');
+  ['dragenter','dragover'].forEach(evtName => {
+    zone.addEventListener(evtName, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      zone.classList.add('dragover');
+    });
+  });
+  ['dragleave','drop'].forEach(evtName => {
+    zone.addEventListener(evtName, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      zone.classList.remove('dragover');
+    });
+  });
+  zone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if(files && files.length){
+      handlePhotoSelect({ target: { files, value:'' } });
+    }
+  });
+}
+
+/* ---------- LIGHTBOX ---------- */
+function openLightbox(photos, index){
+  lightboxPhotos = photos;
+  lightboxIndex = index;
+  updateLightbox();
+  document.getElementById('lightboxOverlay').classList.add('open');
+}
+
+function updateLightbox(){
+  document.getElementById('lightboxImg').src = lightboxPhotos[lightboxIndex];
+  document.getElementById('lightboxCounter').textContent = `${lightboxIndex+1} / ${lightboxPhotos.length}`;
+  const multi = lightboxPhotos.length > 1;
+  document.getElementById('lightboxPrev').style.display = multi ? 'flex' : 'none';
+  document.getElementById('lightboxNext').style.display = multi ? 'flex' : 'none';
+}
+
+function lightboxNav(dir){
+  lightboxIndex = (lightboxIndex + dir + lightboxPhotos.length) % lightboxPhotos.length;
+  updateLightbox();
+}
+
+function closeLightbox(){
+  document.getElementById('lightboxOverlay').classList.remove('open');
+}
+
+function lightboxOverlayClick(e){
+  if(e.target.id === 'lightboxOverlay') closeLightbox();
+}
+
+function openModal(prefillId){
+  if(!isAdmin) return;
+  document.getElementById('modalTitle').textContent = prefillId ? 'Edit Task Entry' : 'New Task Entry';
+  document.getElementById('editId').value = prefillId || '';
+  document.getElementById('newCategoryRow').classList.remove('open');
+  document.getElementById('fNewCategory').value = '';
+  if(prefillId){
+    const e = entries.find(x => x.id === prefillId);
+    document.getElementById('fDate').value = e.date;
+    document.getElementById('fTime').value = formatTo12Hour(e.time);
+    document.getElementById('fItemName').value = e.itemName || '';
+    document.getElementById('fDesc').value = e.desc;
+    populateFormCategorySelect(e.category);
+    document.getElementById('fStatus').value = e.status;
+    document.getElementById('fRemarks').value = e.remarks || 'ok';
+    document.getElementById('fRequester').value = e.requester || '';
+    document.getElementById('fNotes').value = e.notes || '';
+    document.getElementById('fNoteColor').value = e.noteColor || 'none';
+    currentPhotos = e.photos ? [...e.photos] : [];
+  }else{
+    document.getElementById('fDate').value = (selectedDate && selectedDate !== 'ALL') ? selectedDate : todayStr();
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const formattedHours = hours % 12 || 12;
+    document.getElementById('fTime').value = `${formattedHours}:${minutes} ${ampm}`;
+    document.getElementById('fItemName').value = '';
+    document.getElementById('fDesc').value = '';
+    populateFormCategorySelect();
+    document.getElementById('fStatus').value = 'done';
+    document.getElementById('fRemarks').value = 'ok';
+    document.getElementById('fRequester').value = '';
+    document.getElementById('fNotes').value = '';
+    document.getElementById('fNoteColor').value = 'none';
+    currentPhotos = [];
+  }
+  renderPhotoPreviews();
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('fDesc').focus();
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  currentPhotos = [];
+}
+
+function editEntry(id){ openModal(id); }
+
+function deleteEntry(id){
+  if(!isAdmin) return;
+  if(!confirm('Delete this task entry? This cannot be undone.')) return;
+  entries = entries.filter(e => e.id !== id);
+  saveEntries();
+  renderEntries();
+}
+
+/* ---------- NOTIFICATION DISPATCHER ---------- */
+async function sendPendingNotification(taskData) {
+  if(!NOTIFICATION_API_URL) return;
+  try {
+    const response = await fetch(NOTIFICATION_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskData)
+    });
+    const resData = await response.json();
+    if(resData.success){
+      console.log('Pending task SMS notification triggered successfully.');
+    }
+  } catch (error) {
+    console.warn('Could not dispatch SMS notification:', error);
+  }
+}
+
+function saveEntry(){
+  if(!isAdmin) return;
+  const desc = document.getElementById('fDesc').value.trim();
+  if(!desc){ alert('Please enter a task description.'); return; }
+  const date = document.getElementById('fDate').value || todayStr();
+  const id = document.getElementById('editId').value;
+
+  const data = {
+    id: id || ('e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+    date: date,
+    time: formatTo12Hour(document.getElementById('fTime').value.trim()),
+    itemName: document.getElementById('fItemName').value.trim(),
+    desc: desc,
+    category: document.getElementById('fCategory').value,
+    status: document.getElementById('fStatus').value,
+    remarks: document.getElementById('fRemarks').value,
+    requester: document.getElementById('fRequester').value.trim(),
+    notes: document.getElementById('fNotes').value.trim(),
+    noteColor: document.getElementById('fNoteColor').value,
+    photos: [...currentPhotos],
+  };
+
+  if(id){
+    const idx = entries.findIndex(e => e.id === id);
+    if(idx > -1) entries[idx] = data;
+  }else{
+    entries.push(data);
+  }
+
+  try{
+    saveEntries();
+    
+    // SEND SMS NOTIFICATION IF TASK IS PENDING
+    if (data.status === 'pending') {
+      sendPendingNotification(data);
+    }
+  }catch(err){
+    alert('Storage limit reached. Try removing photos from this or older entries, or export & clear old logs.');
+    return;
+  }
+  selectedDate = date;
+  currentPhotos = [];
+  closeModal();
+  renderEntries();
+}
+
+/* ---------- WORD / PDF EXPORT ---------- */
+let exportFormat = 'docx';
+
+function openExportModal(format){
+  if(!isAdmin) return;
+  exportFormat = format;
+  document.getElementById('exportModalTitle').textContent = format === 'docx' ? 'Export to Word' : 'Export to PDF';
+  document.getElementById('exportConfirmBtn').textContent = format === 'docx' ? 'Export .docx' : 'Export .pdf';
+  document.getElementById('exportRangeMode').value = selectedDate === 'ALL' ? 'all' : 'current';
+  updateExportRangeVisibility();
+  document.getElementById('exportFrom').value = selectedDate === 'ALL' ? todayStr() : selectedDate;
+  document.getElementById('exportTo').value = selectedDate === 'ALL' ? todayStr() : selectedDate;
+  document.getElementById('exportProgress').style.display = 'none';
+  document.getElementById('exportModalOverlay').classList.add('open');
+}
+
+function closeExportModal(){
+  document.getElementById('exportModalOverlay').classList.remove('open');
+}
+
+function updateExportRangeVisibility(){
+  const mode = document.getElementById('exportRangeMode').value;
+  document.getElementById('exportRangeFields').style.display = mode === 'range' ? 'grid' : 'none';
+}
+
+function getExportEntries(){
+  const mode = document.getElementById('exportRangeMode').value;
+  let list;
+  if(mode === 'current'){
+    list = selectedDate === 'ALL' ? [...entries] : entries.filter(e => e.date === selectedDate);
+  }else if(mode === 'all'){
+    list = [...entries];
+  }else{
+    const from = document.getElementById('exportFrom').value;
+    const to = document.getElementById('exportTo').value;
+    list = entries.filter(e => e.date >= from && e.date <= to);
+  }
+  list.sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time));
+  return list;
+}
+
+function getExportRangeLabel(){
+  const mode = document.getElementById('exportRangeMode').value;
+  if(mode === 'current') return selectedDate === 'ALL' ? 'All Entries' : fmtDateLabel(selectedDate).full;
+  if(mode === 'all') return 'All Entries';
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  if(from && to){
+    if(from === to) return fmtDateLabel(from).full;
+    return fmtDateLabel(from).full + '  —  ' + fmtDateLabel(to).full;
+  }
+  return 'Selected Range';
+}
+
+async function runExport(){
+  const list = getExportEntries();
+  if(list.length === 0){
+    alert('No entries found in the selected range.');
+    return;
+  }
+  const progressEl = document.getElementById('exportProgress');
+  progressEl.style.display = 'block';
+  progressEl.textContent = 'Generating file...';
+  document.getElementById('exportConfirmBtn').disabled = true;
+
+  try{
+    if(exportFormat === 'docx'){
+      await exportToWord(list);
+    }else{
+      await exportToPDF(list);
+    }
+    closeExportModal();
+  }catch(err){
+    console.error(err);
+    alert('Export failed: ' + err.message);
+  }finally{
+    document.getElementById('exportConfirmBtn').disabled = false;
+    progressEl.style.display = 'none';
+  }
+}
+
+function statusText(s){ return { done:'Done', pending:'Pending', ongoing:'Ongoing' }[s] || 'Done'; }
+function remarksText(r){ return r === 'replace' ? 'Needs Replacement' : 'Okay'; }
+
+function dataUrlToUint8(dataUrl){
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function exportToWord(list){
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+          WidthType, ShadingType, BorderStyle, ImageRun, AlignmentType } = docx;
+
+  const rangeLabel = getExportRangeLabel();
+  const days = [...new Set(list.map(e => e.date))].sort();
+
+  const children = [];
+
+  children.push(new Paragraph({
+    text: 'My Work Log',
+    heading: HeadingLevel.HEADING_1,
+  }));
+  children.push(new Paragraph({
+    children: [ new TextRun({ text: rangeLabel, color: '5B7C99', size: 22 }) ],
+    spacing: { after: 300 },
+  }));
+
+  for(const day of days){
+    const dayEntries = list.filter(e => e.date === day);
+    children.push(new Paragraph({
+      text: fmtDateLabel(day).full,
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 150 },
+    }));
+
+    for(const e of dayEntries){
+      const headerParts = [`${e.date} ${formatTo12Hour(e.time)}`, e.category || 'Other'];
+      if(e.itemName) headerParts.push(e.itemName);
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ text: headerParts.join('   •   '), bold: true, size: 22 }),
+        ],
+        spacing: { before: 200 },
+      }));
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ text: 'Status: ' + statusText(e.status), size: 18, color: '5B7C99' }),
+          new TextRun({ text: '     Remarks: ' + remarksText(e.remarks), size: 18, color: e.remarks === 'replace' ? 'C4675A' : '6B9B7C' }),
+        ],
+        spacing: { after: 80 },
+      }));
+      children.push(new Paragraph({
+        children: [ new TextRun({ text: e.desc || '', size: 21 }) ],
+        spacing: { after: 80 },
+      }));
+      if(e.requester){
+        children.push(new Paragraph({
+          children: [ new TextRun({ text: 'Requested by: ' + e.requester, italics: true, size: 19, color: '666D7A' }) ],
+          spacing: { after: 40 },
+        }));
+      }
+      if(e.notes){
+        const colorTagStr = (e.noteColor && e.noteColor !== 'none') ? `[${e.noteColor.toUpperCase()}] ` : '';
+        children.push(new Paragraph({
+          children: [ new TextRun({ text: 'Notes: ' + colorTagStr + e.notes, size: 19, color: '666D7A' }) ],
+          spacing: { after: 40 },
+        }));
+      }
+      if(e.photos && e.photos.length){
+        for(const photo of e.photos){
+          try{
+            const bytes = dataUrlToUint8(photo);
+            children.push(new Paragraph({
+              children: [ new ImageRun({ data: bytes, type: 'jpg', transformation: { width: 320, height: 320 } }) ],
+              spacing: { before: 60, after: 100 },
+            }));
+          }catch(imgErr){ console.warn('Skipping photo embedding', imgErr); }
+        }
+      }
+      children.push(new Paragraph({ text: '--------------------------------------------------', color: 'CCCCCC' }));
+    }
+  }
+
+  const doc = new Document({
+    sections: [{ properties: {}, children }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `My_Work_Log_${todayStr()}.docx`);
+}
+
+async function exportToPDF(list){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const margin = 40;
+  let y = margin;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const maxW = pageWidth - margin*2;
+
+  function checkPage(needed = 20){
+    if(y + needed > pageHeight - margin){
+      doc.addPage();
+      y = margin;
+    }
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('My Work Log', margin, y); y += 22;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text(getExportRangeLabel(), margin, y); y += 24;
+
+  const days = [...new Set(list.map(e => e.date))].sort();
+
+  for(const day of days){
+    checkPage(40);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(0);
+    doc.text(fmtDateLabel(day).full, margin, y); y += 18;
+
+    const dayEntries = list.filter(e => e.date === day);
+    for(const e of dayEntries){
+      checkPage(50);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(91,124,153);
+      const head = `${e.date} ${formatTo12Hour(e.time)}  |  ${e.category||'Other'}${e.itemName ? '  |  ' + e.itemName : ''}`;
+      doc.text(head, margin, y); y += 14;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text(`Status: ${statusText(e.status)}   •   Remarks: ${remarksText(e.remarks)}`, margin, y); y += 12;
+
+      doc.setFontSize(10);
+      doc.setTextColor(20);
+      const descLines = doc.splitTextToSize(e.desc || '', maxW);
+      checkPage(descLines.length * 12 + 10);
+      doc.text(descLines, margin, y); y += descLines.length * 12 + 4;
+
+      if(e.requester){
+        checkPage(14);
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`Requested by: ${e.requester}`, margin, y); y += 12;
+      }
+      if(e.notes){
+        checkPage(14);
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        const colorTagStr = (e.noteColor && e.noteColor !== 'none') ? `[${e.noteColor.toUpperCase()}] ` : '';
+        doc.text(`Notes: ${colorTagStr}${e.notes}`, margin, y); y += 12;
+      }
+
+      if(e.photos && e.photos.length){
+        for(const photo of e.photos){
+          checkPage(160);
+          try{
+            doc.addImage(photo, 'JPEG', margin, y, 180, 180);
+            y += 190;
+          }catch(eErr){ console.warn('PDF image draw fail', eErr); }
+        }
+      }
+
+      y += 6;
+      checkPage(10);
+      doc.setDrawColor(220);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 12;
+    }
+  }
+
+  doc.save(`My_Work_Log_${todayStr()}.pdf`);
+}
+
+function exportAllJSON(){
+  if(!isAdmin) return;
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    categories: customCategories,
+    entries: entries
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  saveAs(blob, `Work_log_v2_backup_${todayStr()}.json`);
+}
+
+function triggerImport(){
+  if(!isAdmin) return;
+  document.getElementById('importFile').click();
+}
+
+function importJSON(evt){
+  if(!isAdmin) return;
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data || !Array.isArray(data.entries)){
+        alert('Invalid import file format.');
+        return;
+      }
+      if(!confirm(`Import ${data.entries.length} entries? This will merge with your existing logs.`)) return;
+
+      const map = new Map(entries.map(item => [item.id, item]));
+      data.entries.forEach(item => map.set(item.id, item));
+      entries = Array.from(map.values());
+      saveEntries();
+
+      if(Array.isArray(data.categories)){
+        data.categories.forEach(c => { if(!customCategories.includes(c)) customCategories.push(c); });
+        saveCategories();
+      }
+
+      renderEntries();
+      alert('Import successful!');
+    }catch(err){
+      alert('Error parsing JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+/* ---------- INIT ---------- */
+window.addEventListener('DOMContentLoaded', () => {
+  loadCategories();
+  loadEntries();
+  renderEntries();
+  setupDragDrop();
+});
+</script>
+</body>
+</html>
